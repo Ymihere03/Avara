@@ -1610,10 +1610,16 @@ void CAbstractPlayer::PlayerAction() {
         targetOffs[1]->isTransparent = true; // in PlaceHUDParts.
         ResetDashboard();
 
-        if (isInLimbo) {
-            if (!netDestruct)
-                KeyboardControl(itsManager->GetFunctions());
 
+        if (isInLimbo) {
+            if (!netDestruct) {
+                KeyboardControl(itsManager->GetFunctions());
+                itsManager->CheckForWaitingFrames();
+            }
+
+            if (itsGame->NetWaiting)
+                return;
+                
             if (winFrame < 0) {
                 if (limboCount-- <= 0) {
                     if (lives > 0) {
@@ -1648,8 +1654,13 @@ void CAbstractPlayer::PlayerAction() {
 
             fireGun = false;
 
-            if (!netDestruct)
+            if (!netDestruct) {
                 KeyboardControl(itsManager->GetFunctions());
+                itsManager->CheckForWaitingFrames();
+            }
+
+            if (itsGame->NetWaiting)
+                return;
 
             UnlinkLocation();
             radius = proximityRadius + FDistanceOverEstimate(speed[0], speed[1], speed[2]);

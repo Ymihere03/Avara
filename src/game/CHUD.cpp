@@ -277,6 +277,48 @@ void CHUD::DrawImage(NVGcontext* ctx, int image, float alpha,
 	nvgFill(ctx);
 }
 
+void CHUD::RenderNetStats(NVGcontext *ctx) {
+    CNetManager *net = itsGame->itsApp->GetNet();
+    CAbstractPlayer *player = itsGame->GetLocalPlayer();
+
+    //short frameDiff = thisPlayer->GetFrameDifference();
+    //nvgText(ctx, 30*i, 10, std::to_string(frameDiff).c_str(), NULL);
+    ARGBColor waitColor;
+    if (itsGame->veryLongWait) {
+        waitColor = 0xffff0000;
+    } else if (itsGame->longWait) {
+        waitColor = 0xffff8800;
+    } else if (itsGame->didWait) {
+        waitColor = 0xffffff00;
+    } else {
+        waitColor = 0xff00ff00;
+    }
+    nvgBeginPath(ctx);
+    nvgRect(ctx, 0, 0, 20, 20);
+    nvgFillColor(ctx, waitColor.IntoNVG());
+    nvgFill(ctx);
+
+    nvgBeginPath(ctx);
+    nvgRect(ctx, 0, 0, 200, 100);
+    nvgFillColor(ctx, nvgRGBA(20, 20, 20, 100));
+    nvgFill(ctx);
+
+    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255));
+    nvgTextAlign(ctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+    nvgFontSize(ctx, 15.0);
+    std::string fps = "fps: " + std::to_string(itsGame->fps);
+    nvgText(ctx, 0, 0, fps.c_str(), NULL);
+
+    //int frameDifference = player->framef
+    
+    for (int i = 0; i < kMaxAvaraPlayers; i++) {
+        CPlayerManager *thisPlayer = net->playerTable[i].get();
+        std::string playerName = thisPlayer->GetPlayerName();
+        if (thisPlayer->GetPlayer() != itsGame->GetLocalPlayer())
+            continue;
+    }
+}
+
 void CHUD::Render(NVGcontext *ctx) {
     auto view = gRenderer->viewParams;
     CAbstractPlayer *player = itsGame->GetLocalPlayer();
@@ -740,7 +782,7 @@ void CHUD::DrawKillFeed(NVGcontext *ctx, CNetManager *net, int bufferWidth, floa
                     float teamColorRGB[3], teamTargetColorRGB[3], iconLeftMargin = 23.0f;
 
                     // Get how wide the event rect needs to be
-                    std::string eventText = killerName + "     " + killedName;
+                    std::string eventText = killerName + "     " + killedName + " " + std::to_string(event.frameNumber);
                     if (event.weaponUsed == ksiObjectCollision) {
                         eventText = "    " + killedName;
                         killerName = "";

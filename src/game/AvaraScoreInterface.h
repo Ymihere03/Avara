@@ -165,6 +165,7 @@ typedef struct {
     ScoreInterfaceReasons scoreType;    // Weapon that caused the event
     ScoreInterfaceReasons weaponUsed;   // Weapon that caused the event
 
+    // Event object used to display an event in the kill feed section
 } ScoreInterfaceEvent;
 
 typedef void ScoreInterfaceCallType(ScoreInterfaceRecord *rec);

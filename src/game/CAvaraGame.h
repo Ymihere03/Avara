@@ -14,6 +14,7 @@
 #include "CDirectObject.h"
 #include "Types.h"
 #include "CNetManager.h"
+#include "CTimer.h"
 
 #include <SDL2/SDL.h>
 #include <string>
@@ -94,6 +95,8 @@ public:
 
     FrameTime frameTime; //	In milliseconds.
     double fpsScale;  // 0.25 => CLASSICFRAMETIME / 4
+    CTimer *timer;
+    int fps;
 
     SpawnOrder spawnOrder;
 
@@ -182,6 +185,7 @@ public:
     long lastFrameTime;
     Boolean canPreSend;
 
+    Boolean NetWaiting; // False if frames are not current meaning game is not currently synced
     Boolean didWait;
     Boolean longWait;
     Boolean veryLongWait;
@@ -262,7 +266,8 @@ public:
 
     virtual CPlayerManager *GetPlayerManager(CAbstractPlayer *thePlayer);
     virtual CPlayerManager *FindPlayerManager(CAbstractPlayer *thePlayer);
-
+    
+    virtual void UpdateNetStatHistory();
     virtual long RoundTripToFrameLatency(long rtt);
     virtual void SetFrameLatency(short newFrameLatency, short maxChange = 2, CPlayerManager *slowPlayer = nullptr);
     virtual FrameNumber TimeToFrameCount(long timeInMsec);

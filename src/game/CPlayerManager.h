@@ -61,6 +61,16 @@ static const char* triangle_utf8  = "\xCE\x94";      // Δ
 static const char* clearChat_utf8 = "\x1B";          // Fn-Del on Mac
 static const char* eyeballs_utf8  = "\xF0\x9F\x91\x80";
 
+typedef struct {
+    long rtt;
+    int frameNumber;
+} NetStat;
+
+typedef struct {
+    Boolean didDrop;
+    int frameNumber;
+} FrameStat;
+
 class CPlayerManager {
 protected:
     static CPlayerManager* theLocalPlayer;
@@ -80,6 +90,7 @@ public:
 
     virtual void GameKeyPress(char c) = 0;
     virtual FunctionTable *GetFunctions() = 0;
+    virtual void CheckForWaitingFrames() = 0;
     virtual void DeadOrDone() = 0;
     virtual short Position() = 0;
     virtual Str255& PlayerName() = 0;
@@ -120,6 +131,10 @@ public:
     virtual CAbstractPlayer *ChooseActor(CAbstractPlayer *actorList, short myTeamColor) = 0;
     virtual short GetStatusChar() = 0;
     virtual short GetMessageIndicator() = 0;
+    virtual short GetFrameDifference() = 0;
+    virtual void WriteNetHistory(NetStat netStat) = 0;
+    virtual std::deque<NetStat> *GetNetHistory() = 0;
+    virtual std::deque<FrameStat> *GetFrameHistory() = 0;
 
     virtual void StoreMugShot(Handle mugHandle) = 0;
     virtual Handle GetMugShot() = 0;
@@ -203,6 +218,9 @@ private:
 
     PlayerConfigRecord theConfiguration {};
 
+    std::deque<NetStat> netHistory;
+    std::deque<FrameStat> frameHistory;
+
     std::unordered_map<SDL_Scancode, uint32_t> keyMap; // maps keyboard key to keyFunc
 
 public:
@@ -224,6 +242,7 @@ public:
     virtual void ViewControl();
 
     virtual FunctionTable *GetFunctions();
+    virtual void CheckForWaitingFrames();
     virtual void SendResendRequest(short askCount);
 
     virtual void Dispose();
@@ -273,6 +292,10 @@ public:
     virtual short Position();
     virtual Str255& PlayerName();
     virtual std::string GetPlayerName();
+    virtual short GetFrameDifference();
+    virtual void WriteNetHistory(NetStat netStat);
+    virtual std::deque<NetStat> *GetNetHistory();
+    virtual std::deque<FrameStat> *GetFrameHistory();
 
     virtual std::deque<char>& LineBuffer();
     virtual CAbstractPlayer* GetPlayer();

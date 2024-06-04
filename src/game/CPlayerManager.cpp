@@ -524,6 +524,16 @@ FunctionTable *CPlayerManagerImpl::GetFunctions() {
     // SDL_Log("CPlayerManagerImpl::GetFunctions, %u, %hd\n", itsGame->frameNumber, slot);
     FrameNumber ffi = (itsGame->frameNumber);
     short i = (FUNCTIONBUFFERS - 1) & ffi;
+
+    return &frameFuncs[i].ft;
+}
+
+// Check if frames are up-to-date with other players
+// If they are not then the game cannot proceed
+void CPlayerManagerImpl::CheckForWaitingFrames() {
+    // SDL_Log("CPlayerManagerImpl::GetFunctions, %u, %hd\n", itsGame->frameNumber, slot);
+    FrameNumber ffi = (itsGame->frameNumber);
+    short i = (FUNCTIONBUFFERS - 1) & ffi;
     static int ASK_INTERVAL = MSEC_TO_TICK_COUNT(500);
     static int WAITING_MESSAGE_COUNT = 4;
 
@@ -543,7 +553,7 @@ FunctionTable *CPlayerManagerImpl::GetFunctions() {
             askAgainTime += 2 + (rand() & 3);  // 2-5 ticks = 33-83ms = 2.1-5.2 frames (16ms)
         }
 
-        while (frameFuncs[i].validFrame < itsGame->frameNumber) {
+        if (frameFuncs[i].validFrame < itsGame->frameNumber) {
             theNetManager->ProcessQueue();
 
             // While we're waiting for packets, process key/mouse events so they don't build up.
@@ -560,6 +570,7 @@ FunctionTable *CPlayerManagerImpl::GetFunctions() {
             quickTick = TickCount();
 
             if (quickTick - askAgainTime >= 0) {
+                itsGame->NetWaiting = true;
                 SendResendRequest(askCount++);
                 // if we get the packet from the Resend above, it might be stuck on the end of the readQ waiting for
                 // a lost packet, so skip 1 lost packet every other time until it frees up the queue again
@@ -587,8 +598,13 @@ FunctionTable *CPlayerManagerImpl::GetFunctions() {
             // allow immediate abort after the kmWaitingForPlayer message displays
             if ((askCount >= WAITING_MESSAGE_COUNT && TestKeyPressed(kfuAbortGame)) || quickTick > giveUpTime) {
                 itsGame->statusRequest = kAbortStatus;
-                break;
+                itsGame->NetWaiting = false;
             }
+        } 
+        
+        // Check if frames are back to current
+        if (frameFuncs[i].validFrame == itsGame->frameNumber) {
+            itsGame->NetWaiting = false;
         }
 
         // give up after newer frames appear in the frameFuncs buffer because that
@@ -616,8 +632,6 @@ FunctionTable *CPlayerManagerImpl::GetFunctions() {
             itsGame->longWait = true;
         }
     }
-
-    return &frameFuncs[i].ft;
 }
 
 void CPlayerManagerImpl::RosterKeyPress(unsigned char c) {
@@ -1139,6 +1153,24 @@ void CPlayerManagerImpl::RemoveFromGame() {
 
 void CPlayerManagerImpl::DeadOrDone() {
     theNetManager->deadOrDonePlayers |= 1 << slot;
+}
+
+short CPlayerManagerImpl::GetFrameDifference() {
+    FrameNumber ffi = (itsGame->frameNumber);
+    short i = (FUNCTIONBUFFERS - 1) & ffi;
+    return frameFuncs[i].validFrame;
+}
+
+void CPlayerManagerImpl::WriteNetHistory(NetStat netStat) {
+    netHistory.push_front(netStat);
+}
+
+std::deque<NetStat> *CPlayerManagerImpl::GetNetHistory() {
+    return &netHistory;
+}
+
+std::deque<FrameStat> *CPlayerManagerImpl::GetFrameHistory() {
+    return &frameHistory;
 }
 
 short CPlayerManagerImpl::GetStatusChar() {

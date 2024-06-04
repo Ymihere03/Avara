@@ -177,6 +177,9 @@ void CAvaraAppImpl::drawContents() {
         } else {
             ui->Render(mNVGContext);
         }
+        if (true /*Get<bool>kShowDebug*/) {
+            ui->RenderNetStats(mNVGContext);
+        }
     }
 }
 

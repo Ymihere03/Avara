@@ -50,6 +50,8 @@
 #include "Debug.h"
 #include "AbstractRenderer.h"
 
+#include <chrono>
+
 void CAvaraGame::InitMixer(Boolean silentFlag) {
     CSoundMixer *aMixer;
 
@@ -144,6 +146,7 @@ void CAvaraGame::IAvaraGame(CAvaraApp *theApp) {
     nextPingTime = 0;
 
     showNewHUD = gApplication ? gApplication->Get<bool>(kShowNewHUD) : false;
+    timer = timer->GetInstance();
     // CalcGameRect();
 
     // vg = AvaraVGContext();
@@ -439,11 +442,13 @@ void CAvaraGame::RunFrameActions() {
     // SDL_Log("CAvaraGame::RunFrameActions\n");
     CAbstractPlayer *thePlayer;
 
-    itsDepot->FrameAction();
+    if (!NetWaiting) {
+        itsDepot->FrameAction();
 
-    postMortemList = NULL;
+        postMortemList = NULL;
 
-    RunActorFrameActions();
+        RunActorFrameActions();
+    }
 
     itsNet->ProcessQueue();
     if (!latencyTolerance) {
@@ -850,28 +855,30 @@ bool CAvaraGame::GameTick() {
     // Not time to process the next frame yet
     if (startTime < nextScheduledFrame)
         return false;
+    
+    if (!NetWaiting) {
+        // SDL_Log("CAvaraGame::GameTick frame=%d dt=%d start=%d end=%d\n", frameNumber, SDL_GetTicks() - lastFrameTime,
+        // startTime, endTime); lastFrameTime = SDL_GetTicks();
 
-    // SDL_Log("CAvaraGame::GameTick frame=%d dt=%d start=%d end=%d\n", frameNumber, SDL_GetTicks() - lastFrameTime,
-    // startTime, endTime); lastFrameTime = SDL_GetTicks();
+        oldPlayersStanding = playersStanding;
+        oldTeamsStanding = teamsStanding;
 
-    oldPlayersStanding = playersStanding;
-    oldTeamsStanding = teamsStanding;
+        didWait = false;
+        longWait = false;
+        veryLongWait = false;
+        playersStanding = 0;
+        teamsStanding = 0;
+        teamsStandingMask = 0;
 
-    didWait = false;
-    longWait = false;
-    veryLongWait = false;
-    playersStanding = 0;
-    teamsStanding = 0;
-    teamsStandingMask = 0;
+        ViewControl(); // This was called by itsApp->theGameWind->DoUpdate() calling RefreshWindow
 
-    ViewControl(); // This was called by itsApp->theGameWind->DoUpdate() calling RefreshWindow
+        soundHub->HouseKeep();
+        soundTime = soundHub->ReadTime();
 
-    soundHub->HouseKeep();
-    soundTime = soundHub->ReadTime();
-
-    // SetPort(itsWindow);
-    // SetPolyWorld(&itsPolyWorld);
-    // TrackWindow();
+        // SetPort(itsWindow);
+        // SetPolyWorld(&itsPolyWorld);
+        // TrackWindow();
+    }
 
     RunFrameActions();
 
@@ -882,16 +889,18 @@ bool CAvaraGame::GameTick() {
     if (teamsStanding == 1 && oldTeamsStanding > 1) {
         FlagMessage(iWinTeam + firstVariable);
     }
+    
+    if (!NetWaiting) {
+        // do latency adjustement before frameNumber increments
+        itsNet->AutoLatencyControl(frameNumber, longWait);
 
-    // do latency adjustement before frameNumber increments
-    itsNet->AutoLatencyControl(frameNumber, longWait);
-
-    // increment frameNumber, set nextScheduledFrame time
-    IncrementFrame();
+        // increment frameNumber, set nextScheduledFrame time
+        IncrementFrame();
+    }
 
     timeInSeconds = frameNumber * frameTime / 1000;
 
-    if (latencyTolerance)
+    if (latencyTolerance && !NetWaiting)
         while (FramesFromNow(latencyTolerance) > topSentFrame)
             itsNet->FrameAction();
 
@@ -902,9 +911,11 @@ bool CAvaraGame::GameTick() {
         nextScheduledFrame = startTime + frameTime;
     }
 
-    itsDepot->RunSliverActions();
-    itsApp->StartFrame(frameNumber);
-    ViewControl();
+    if (!NetWaiting) {
+        itsDepot->RunSliverActions();
+        itsApp->StartFrame(frameNumber);
+        ViewControl();
+    }
 
     if ((itsNet->activePlayersDistribution & itsNet->deadOrDonePlayers) == itsNet->activePlayersDistribution) {
         statusRequest = kWinStatus; //	Just a guess, really. StopGame will change this.
@@ -1023,6 +1034,14 @@ void CAvaraGame::Render() {
     //if (gameStatus == kPlayingStatus || gameStatus == kPauseStatus || gameStatus == kWinStatus || gameStatus == kLoseStatus) {
     showNewHUD = gApplication ? gApplication->Get<bool>(kShowNewHUD) : false;
     ViewControl();
+    
+    // Calc frames per second
+    std::chrono::milliseconds renderTime = timer->end(); // Time to render this frame
+    if (frameNumber % 15 == 0) { // Update fps counter every 15 frames
+        fps = 1000.0 / renderTime.count(); // Convert to frames per second
+    }
+    timer->start();
+
     gRenderer->RenderFrame();
 }
 
@@ -1036,6 +1055,20 @@ CPlayerManager *CAvaraGame::GetPlayerManager(CAbstractPlayer *thePlayer) {
     }
 
     return theManager;
+}
+
+void CAvaraGame::UpdateNetStatHistory() {
+    NetStat netStat;
+    CPlayerManager *theManager = nullptr;
+
+    for (int i = 0; i < kMaxAvaraPlayers; i++) {
+        theManager = itsNet->playerTable[i].get();
+        if (theManager->GetPlayerName().length() <= 0) continue;
+
+        netStat.rtt = itsNet->itsCommManager->GetMaxRoundTrip(1 << i);
+        netStat.frameNumber = frameNumber;
+        theManager->WriteNetHistory(netStat);
+    }
 }
 
 // FrameLatency is slightly different than LatencyTolerance.  It is in terms of integer frames

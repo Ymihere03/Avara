@@ -18,6 +18,7 @@ public:
 
     void Render(NVGcontext *ctx);
     void RenderNewHUD(NVGcontext *ctx);
+    void RenderNetStats(NVGcontext *ctx);
     void DrawLevelName(NVGcontext *ctx);
     void DrawPaused(NVGcontext *ctx);
     void DrawScore(std::vector<CPlayerManager*>& thePlayers, int chudHeight, NVGcontext *ctx);
