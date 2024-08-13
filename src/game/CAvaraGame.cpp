@@ -144,6 +144,7 @@ void CAvaraGame::IAvaraGame(CAvaraApp *theApp) {
     statusRequest = kNoVehicleStatus;
 
     nextPingTime = 0;
+    nextLoadTime = 0;
 
     showNewHUD = gApplication ? gApplication->Get<bool>(kShowNewHUD) : false;
     timer = timer->GetInstance();
@@ -458,7 +459,7 @@ void CAvaraGame::RunFrameActions() {
     }
 
     thePlayer = playerList;
-    while (thePlayer && statusRequest != kAbortStatus) { // itsNet->ProcessQueue();
+    while (thePlayer) {
         nextPlayer = thePlayer->nextPlayer;
         thePlayer->PlayerAction();
         thePlayer = nextPlayer;
@@ -848,6 +849,16 @@ bool CAvaraGame::GameTick() {
         nextPingTime = startTime + pingInterval;
     }
 
+    int randLoadPeriod = Debug::GetValue("rload"); // randomly load a level every `rload` seconds
+    if (randLoadPeriod > 0) {
+        if (startTime > nextLoadTime) {
+            auto p = CPlayerManagerImpl::LocalPlayer();
+            auto *tui = itsApp->GetTui();
+            tui->ExecuteMatchingCommand("/rand", p);
+            nextLoadTime = startTime + 1000*randLoadPeriod;
+        }
+    }
+
     // Not playing? Nothing to do!
     if (statusRequest != kPlayingStatus)
         return false;
@@ -1168,7 +1179,7 @@ void CAvaraGame::IncrementFrame(bool firstFrame) {
     isClassicFrame = (frameNumber % (CLASSICFRAMETIME / frameTime) == 0);
 }
 
-FrameNumber CAvaraGame::FramesFromNow(FrameNumber classicFrameCount) {
+FrameNumber CAvaraGame::FramesFromNow(double classicFrameCount) {
     return frameNumber + classicFrameCount / fpsScale;
 }
 

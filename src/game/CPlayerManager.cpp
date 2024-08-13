@@ -537,8 +537,8 @@ void CPlayerManagerImpl::CheckForWaitingFrames() {
     static int ASK_INTERVAL = MSEC_TO_TICK_COUNT(500);
     static int WAITING_MESSAGE_COUNT = 4;
 
-    // if player is finished don't wait for their frames to sync up
-    if (frameFuncs[i].validFrame != itsGame->frameNumber && itsPlayer->lives > 0) {
+    // don't wait for for players who are completely done (after last life and after limbo)
+    if (frameFuncs[i].validFrame != itsGame->frameNumber && !IsDeadOrDone()) {
         long firstTime = askAgainTime = TickCount();
         long quickTick = firstTime;
         long giveUpTime = firstTime + MSEC_TO_TICK_COUNT(15000);
@@ -1148,11 +1148,9 @@ void CPlayerManagerImpl::AbortRequest() {
 
 void CPlayerManagerImpl::RemoveFromGame() {
     theNetManager->activePlayersDistribution &= ~(1 << slot);
-    theNetManager->itsCommManager->SendUrgentPacket(kdEveryone, kpRemoveMeFromGame, 0, 0, 0, 0, 0);
-}
-
-void CPlayerManagerImpl::DeadOrDone() {
-    theNetManager->deadOrDonePlayers |= 1 << slot;
+    // let inactive players know (not sure if this is even necessary)
+    uint16_t dist = kdEveryone & ~theNetManager->activePlayersDistribution;
+    theNetManager->itsCommManager->SendPacket(dist, kpRemoveMeFromGame, 0, 0, 0, 0, 0);
 }
 
 short CPlayerManagerImpl::GetFrameDifference() {
@@ -1171,6 +1169,14 @@ std::deque<NetStat> *CPlayerManagerImpl::GetNetHistory() {
 
 std::deque<FrameStat> *CPlayerManagerImpl::GetFrameHistory() {
     return &frameHistory;
+}
+
+void CPlayerManagerImpl::DeadOrDone() {
+    theNetManager->deadOrDonePlayers |= 1 << slot;
+}
+
+bool CPlayerManagerImpl::IsDeadOrDone() {
+    return (theNetManager->deadOrDonePlayers & (1 << slot));
 }
 
 short CPlayerManagerImpl::GetStatusChar() {

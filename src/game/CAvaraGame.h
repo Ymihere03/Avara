@@ -182,6 +182,7 @@ public:
 
     uint32_t nextScheduledFrame;
     uint32_t nextPingTime;
+    uint32_t nextLoadTime;
     long lastFrameTime;
     Boolean canPreSend;
 
@@ -274,7 +275,7 @@ public:
     virtual FrameNumber NextFrameForPeriod(long period, long referenceFrame = 0);
     virtual void SetFrameTime(int32_t ft);
     virtual void IncrementFrame(bool firstFrame = false);
-    virtual FrameNumber FramesFromNow(FrameNumber classicFrames);
+    virtual FrameNumber FramesFromNow(double classicFrames);
     virtual void SetSpawnOrder(SpawnOrder order);
 
     void SetKeysFromStdin() { keysFromStdin = true; };
